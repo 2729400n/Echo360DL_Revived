@@ -1,33 +1,33 @@
-# Echo360 Videos Downloader #
+# USYDecho360 #
 
-USYDecho360 is a command-line Python tool that allows you to download lecture videos from any university's Echo360 lecture portal. All that's required is the particular course's url. See the FAQ for tips on how to find it.
+USYDecho360 is a command-line Python tool that allows you to download lecture videos from University of Sydney's Echo360 lecture portal. All that's required is the particular course's UUID. See the FAQ for tips on how to find it.
 
-**NOTE THAT** although this is named as usydEcho360, it _should_ work in all university's echo360 system in theory, see FAQ for details.
 
+Updates as of 18/03/2018: It now will works on canvas echo360 as well (https://canvas.sydney.edu.au/).
 
 # Getting Started #
 
 ### Automated Installation ###
 
 **Linux / MacOS**
-```shell
-./run.sh COURSE_URL  # where COURSE_URL is your course url
+```bash
+./run.sh COURSE_UUID  # where COURSE_UUID is your course id
 ```
 **Windows**
-```shell
-run.bat COURSE_URL  # where COURSE_URL is your course url
+```bash
+run.bat COURSE_UUID  # where COURSE_UUID is your course id
 ```
-The scripts will boostrap all installation and download all needed files on the fly.
+The scripts will boostrap all installiation and download all needed files on the fly.
 ### Optional ###
 - ffmpeg (for transcoding ts file to mp4 file) See [here](https://github.com/adaptlearning/adapt_authoring/wiki/Installing-FFmpeg) for a brief instructions of installing it in different OS.
 
 ## Manual ##
-The provided script automated every operations, and install all dependency in a local python virtual environment. You can also use the system-wise python installation by manual installation. Get started by first install all requirements:
-```shell
+The provided script automated every operation, and install all dependency in a local python virtual environment. You can also use the system-wise python installiation by manual installiation. Get started by first install all requirements:
+```bash
 pip install -r requirements.txt  # or with: python -m pip install -r requirements.txt
 ```
 Then run with:
-```shell
+```
 python usydEcho360.py
 ```
 
@@ -42,9 +42,9 @@ python usydEcho360.py
 **NOTE THAT** all the below command you can substitute `python usydEcho360.py` with `./run.sh` (or `run.bat` if you are in windows)
 
 ### Quick Start ###
-```shell
+```
 >>> python usydEcho360.py                       \
-    https://view.streaming.sydney.edu.au:8443/ess/portal/section/2018_S1C_INFO1001_ND
+    "041698d6-f43a-4b09-a39a-b90475a63530"
 ```
 ### Script args ###
 ```
@@ -53,21 +53,21 @@ python usydEcho360.py
                       [--before-date BEFORE_DATE(YYYY-MM-DD] [--unikey UNIKEY]
                       [--password PASSWORD] [--download-phantomjs-binary]
                       [--chrome]
-                      ECHO360_URL
+                      COURSE_UUID
 
-Download lectures from Echo360 portal.
+Download lectures from USYD's Echo360 portal.
 
 positional arguments:
-  ECHO360_URL           Full URL of the echo360 course page, or only the UUID
-                        (which defaults to USYD). The URL of the course's
-                        video lecture page, for example: http://recordings.eng
-                        ineering.illinois.edu/ess/portal/section/115f3def-7371
-                        -4e98-b72f-6efe53771b2a)
+  COURSE_UUID           Echo360 UUID for the course, which is found in the URL
+                        of the course's video lecture page (e.g.
+                        '115f3def-7371-4e98-b72f-6efe53771b2a' in http://recor
+                        dings.engineering.illinois.edu/ess/portal/section/115f
+                        3def-7371-4e98-b72f-6efe53771b2a)
 
 optional arguments:
   -h, --help            show this help message and exit
   --output OUTPUT_PATH, -o OUTPUT_PATH
-                        Path to the desired output directory. The output
+                        Path to the desired output directory The output
                         directory must exist. Otherwise the current directory
                         is used.
   --after-date AFTER_DATE(YYYY-MM-DD), -a AFTER_DATE(YYYY-MM-DD)
@@ -90,24 +90,23 @@ optional arguments:
   --chrome              Use Chrome Driver instead of phantomjs webdriver. You
                         must have chromedriver installed in your PATH.
 
-
 ```
 # Examples #
-```shell
+```
 >>> python usydEcho360.py                  \
-    "041698d6-f43a-4b09-a39a-b90475a63530" \  # Note this default to USYD's echo360
-    --output "~/Lectures"                     # Use full URL for other University
+    "041698d6-f43a-4b09-a39a-b90475a63530" \
+    --output "~/Lectures"
 ```
 
 ### Download all available lectures ###
-```shell
+```
 >>> python usydEcho360.py                  \
     "041698d6-f43a-4b09-a39a-b90475a63530" \
     --output "~/Lectures"
 ```
 
 ### Download all lectures on or before a date ###
-```shell
+```
 >>> python usydEcho360.py                  \
     "041698d6-f43a-4b09-a39a-b90475a63530" \
     --output "~/Lectures"                  \
@@ -115,7 +114,7 @@ optional arguments:
 ```
 
 ### Download all lectures on or after a date ###
-```shell
+```
 >>> python usydEcho360.py                  \
     "041698d6-f43a-4b09-a39a-b90475a63530" \
     --output "~/Lectures"                  \
@@ -123,7 +122,7 @@ optional arguments:
 ```
 
 ### Download all lectures in a given date range (inclusive) ###
-```shell
+```
 >>> python usydEcho360.py                  \
     "041698d6-f43a-4b09-a39a-b90475a63530" \
     --output "~/Lectures"                  \
@@ -133,7 +132,7 @@ optional arguments:
 
 ### Use chrome driver (instead of phantomjs) ###
 Note: sometime it works better than phantomjs in some system
-```shell
+```
 >>> python usydEcho360.py                  \
     "041698d6-f43a-4b09-a39a-b90475a63530" \
     --chrome
@@ -141,30 +140,21 @@ Note: sometime it works better than phantomjs in some system
 
 # FAQ #
 
-### Is my university supported? ###
-This is primarily built for the echo system in the University of Sydney. But in theory, as long as the url are in the format of:
-```shell
-https://$(hostname)/ess/portal/section/$(UUID)
-```
-... then it should be supported.
-
-The variables `$(hostname)` and `$(UUID)` are what differentiate different University's echo360 system. If there is no credentials needed (ie no need to login before accessing the page), then 90% of the time it should works. If login is needed, some extra work might need to be put in before it works for your university. If that is the case, create an issue to let me know.
-
-### How do I retrieve the Course URL for a course? ###
-You should go to the main Echo360 Lecture page, which usually composed of all the lecturer recordings in a list format as shown below. It's the main page that lists all the recorded lectures and gives you the option to stream them or download them individually. This is important for downloading all the available videos from within the course.
+### How do I retrieve the UUID for a course? ###
+This is the most involved part (unless you have access to a titles file). What you need is the URL to the course's main Echo360 lecture page. It's the main page that lists all the recorded lectures and gives you the option to stream them or download them individually.
 
 ![CIVL4093 Main Echo360 Lecture Page](https://i.imgur.com/jy8a99D.png)
 
 
-You can usually find this link on your course's main webpage. If your course webpage only links directly to videos, then you should be able to navigate back **by clicking the title of your course name (top of page)**.
+You can usually find this link on your course's main webpage. If your course webpage only links directly to videos, then you should be able to navigate back to the main portale via that link.
 
-The URL for the University of Sydney - 2017 semester 2 of CIVL4903 looks like
+The URL for the 2017 semester 2 of CIVL4903 looks like
 
 ```
 https://view.streaming.sydney.edu.au:8443/ess/portal/section/041698d6-f43a-4b09-a39a-b90475a63530
 ```
 
-which you can verify is correct in the above screenshot. The UUID (Unified Unique IDentifier) is the last element of the URL. So in the above example it's,
+which you can verify is correct in the above screenshot. The UUID is the last element of the URL. So in the above example it's,
 
 ```
 041698d6-f43a-4b09-a39a-b90475a63530
