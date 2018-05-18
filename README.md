@@ -1,8 +1,8 @@
 # USYDecho360 #
 
-USYDecho360 is a command-line Python tool that allows you to download lecture videos from any university's Echo360 lecture portal. All that's required is the particular course's url. See the FAQ for tips on how to find it.
+echo360 is a command-line Python tool that allows you to download lecture videos from any university's Echo360 lecture portal. All that's required is the particular course's url. See the FAQ for tips on how to find it.
 
-**NOTE THAT** although this is named as echo360, it _should_ work in all university's echo360 system in theory, see FAQ for details.
+The way this script works _should_ support all university's echo360 system in theory, see FAQ for details.
 
 
 Updates as of 18/03/2018: It now will works on canvas echo360 as well (https://canvas.sydney.edu.au/).
@@ -142,8 +142,22 @@ Note: sometime it works better than phantomjs in some system
 
 # FAQ #
 
+<<<<<<< HEAD:README.md
 ### How do I retrieve the UUID for a course? ###
 This is the most involved part (unless you have access to a titles file). What you need is the URL to the course's main Echo360 lecture page. It's the main page that lists all the recorded lectures and gives you the option to stream them or download them individually.
+=======
+### Is my university supported? ###
+This is first built for the echo system in the University of Sydney, and then validated in several other universities' echo system. In theory, as long as the url are in the format of:
+```shell
+https://$(hostname)/ess/portal/section/$(UUID)
+```
+... then it should be supported.
+
+The variables `$(hostname)` and `$(UUID)` are what differentiate different University's echo360 system. If there is no credentials needed (ie no need to login before accessing the page), then 90% of the time it should works. If login is needed, some extra work might need to be put in before it works for your university. If that is the case, create an issue to let me know.
+
+### How do I retrieve the Course URL for a course? ###
+You should go to the main Echo360 Lecture page, which usually composed of all the lecturer recordings in a list format as shown below. It's the main page that lists all the recorded lectures and gives you the option to stream them or download them individually. This is important for downloading all the available videos from within the course.
+>>>>>>> 210cab5 (renamed the module to a more generic name (as it works for all uni now)):Readme.md
 
 ![CIVL4093 Main Echo360 Lecture Page](https://i.imgur.com/jy8a99D.png)
 
@@ -156,11 +170,21 @@ The URL for the 2017 semester 2 of CIVL4903 looks like
 https://view.streaming.sydney.edu.au:8443/ess/portal/section/041698d6-f43a-4b09-a39a-b90475a63530
 ```
 
+<<<<<<< HEAD:README.md
 which you can verify is correct in the above screenshot. The UUID is the last element of the URL. So in the above example it's,
+=======
+which you can verify is correct in the above screenshot. **This should be the full URL you enter into the script, for all other universities' echo system.**
+>>>>>>> 210cab5 (renamed the module to a more generic name (as it works for all uni now)):Readme.md
 
+The UUID (Unified Unique IDentifier) is the last element of the URL. So in the above example it's,
 ```
 041698d6-f43a-4b09-a39a-b90475a63530
 ```
 
+### Technical details ###
+
+The current script uses a web-driver to emulate as a web-browser in order to retrieve the original streaming link. There are current two options for the web-driver: PhantomJS and Chrome. It then uses a hls downloader to simultaneously download all the smaller parts of the videos, and combined into one. Transcoding into mp4 will be performed if ffmpeg is present in your system, and all files will be renamed into a nice format.
+
 # Credits #
-Credits to [jhalstead85](https://github.com/jhalstead85/lecho360) for which this script is based upon, but this has been adopted to be usable for USYD echo360.
+Credits to [jhalstead85](https://github.com/jhalstead85/lecho360) for which this script is based upon.
+This script has then been adopted to be usable for USYD echo360. It was then extended to work in canvas (which uses a human-readable name instead of UUID); and later automated the entire process and become usable for all other universities.
