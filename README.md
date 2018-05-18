@@ -1,6 +1,8 @@
 # USYDecho360 #
 
-USYDecho360 is a command-line Python tool that allows you to download lecture videos from University of Sydney's Echo360 lecture portal. All that's required is the particular course's UUID. See the FAQ for tips on how to find it.
+USYDecho360 is a command-line Python tool that allows you to download lecture videos from any university's Echo360 lecture portal. All that's required is the particular course's url. See the FAQ for tips on how to find it.
+
+**NOTE THAT** although this is named as echo360, it _should_ work in all university's echo360 system in theory, see FAQ for details.
 
 
 Updates as of 18/03/2018: It now will works on canvas echo360 as well (https://canvas.sydney.edu.au/).
@@ -27,8 +29,8 @@ The provided script automated every operation, and install all dependency in a l
 pip install -r requirements.txt  # or with: python -m pip install -r requirements.txt
 ```
 Then run with:
-```
-python usydEcho360.py
+```shell
+python echo360.py
 ```
 
 ### Operating System ###
@@ -39,16 +41,16 @@ python usydEcho360.py
 
 
 # Usage #
-**NOTE THAT** all the below command you can substitute `python usydEcho360.py` with `./run.sh` (or `run.bat` if you are in windows)
+**NOTE THAT** all the below command you can substitute `python echo360.py` with `./run.sh` (or `run.bat` if you are in windows)
 
 ### Quick Start ###
-```
->>> python usydEcho360.py                       \
-    "041698d6-f43a-4b09-a39a-b90475a63530"
+```shell
+>>> python echo360.py                       \
+    https://view.streaming.sydney.edu.au:8443/ess/portal/section/2018_S1C_INFO1001_ND
 ```
 ### Script args ###
 ```
->>> usage: usydEcho360.py [-h] [--output OUTPUT_PATH]
+>>> usage: echo360.py [-h] [--output OUTPUT_PATH]
                       [--after-date AFTER_DATEYYYY-MM-DD)]
                       [--before-date BEFORE_DATE(YYYY-MM-DD] [--unikey UNIKEY]
                       [--password PASSWORD] [--download-phantomjs-binary]
@@ -85,45 +87,45 @@ optional arguments:
                         Your password for your University of Sydney elearning
                         account
   --download-phantomjs-binary
-                        Force the usydEcho360.py script to download a local
+                        Force the echo360.py script to download a local
                         binary file for phantomjs (will override system bin)
   --chrome              Use Chrome Driver instead of phantomjs webdriver. You
                         must have chromedriver installed in your PATH.
 
 ```
 # Examples #
-```
->>> python usydEcho360.py                  \
-    "041698d6-f43a-4b09-a39a-b90475a63530" \
-    --output "~/Lectures"
+```shell
+>>> python echo360.py                  \
+    "041698d6-f43a-4b09-a39a-b90475a63530" \  # Note this default to USYD's echo360
+    --output "~/Lectures"                     # Use full URL for other University
 ```
 
 ### Download all available lectures ###
-```
->>> python usydEcho360.py                  \
+```shell
+>>> python echo360.py                  \
     "041698d6-f43a-4b09-a39a-b90475a63530" \
     --output "~/Lectures"
 ```
 
 ### Download all lectures on or before a date ###
-```
->>> python usydEcho360.py                  \
+```shell
+>>> python echo360.py                  \
     "041698d6-f43a-4b09-a39a-b90475a63530" \
     --output "~/Lectures"                  \
     --before-date "2014-10-14"
 ```
 
 ### Download all lectures on or after a date ###
-```
->>> python usydEcho360.py                  \
+```shell
+>>> python echo360.py                  \
     "041698d6-f43a-4b09-a39a-b90475a63530" \
     --output "~/Lectures"                  \
     --after-date "2014-10-14"
 ```
 
 ### Download all lectures in a given date range (inclusive) ###
-```
->>> python usydEcho360.py                  \
+```shell
+>>> python echo360.py                  \
     "041698d6-f43a-4b09-a39a-b90475a63530" \
     --output "~/Lectures"                  \
     --after-date "2014-08-26"              \
@@ -132,8 +134,8 @@ optional arguments:
 
 ### Use chrome driver (instead of phantomjs) ###
 Note: sometime it works better than phantomjs in some system
-```
->>> python usydEcho360.py                  \
+```shell
+>>> python echo360.py                  \
     "041698d6-f43a-4b09-a39a-b90475a63530" \
     --chrome
 ```
