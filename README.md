@@ -56,11 +56,6 @@ python echo360.py
                   [--password PASSWORD] [--download-phantomjs-binary]
                   [--chrome] [--debug]
                   ECHO360_URL
-                      [--after-date AFTER_DATEYYYY-MM-DD)]
-                      [--before-date BEFORE_DATE(YYYY-MM-DD] [--unikey UNIKEY]
-                      [--password PASSWORD] [--download-phantomjs-binary]
-                      [--chrome]
-                      COURSE_UUID
 
 Download lectures from USYD's Echo360 portal.
 
@@ -97,7 +92,6 @@ optional arguments:
   --chrome              Use Chrome Driver instead of phantomjs webdriver. You
                         must have chromedriver installed in your PATH.
   --debug               Enable extensive logging.
-
 
 ```
 # Examples #
@@ -149,10 +143,6 @@ Note: sometime it works better than phantomjs in some system
 
 # FAQ #
 
-<<<<<<< HEAD:README.md
-### How do I retrieve the UUID for a course? ###
-This is the most involved part (unless you have access to a titles file). What you need is the URL to the course's main Echo360 lecture page. It's the main page that lists all the recorded lectures and gives you the option to stream them or download them individually.
-=======
 ### Is my university supported? ###
 This is first built for the echo system in the University of Sydney, and then validated in several other universities' echo system. In theory, as long as the url are in the format of:
 ```shell
@@ -164,7 +154,6 @@ The variables `$(hostname)` and `$(UUID)` are what differentiate different Unive
 
 ### How do I retrieve the Course URL for a course? ###
 You should go to the main Echo360 Lecture page, which usually composed of all the lecturer recordings in a list format as shown below. It's the main page that lists all the recorded lectures and gives you the option to stream them or download them individually. This is important for downloading all the available videos from within the course.
->>>>>>> 210cab5 (renamed the module to a more generic name (as it works for all uni now)):Readme.md
 
 ![CIVL4093 Main Echo360 Lecture Page](https://i.imgur.com/jy8a99D.png)
 
@@ -177,11 +166,7 @@ The URL for the 2017 semester 2 of CIVL4903 looks like
 https://view.streaming.sydney.edu.au:8443/ess/portal/section/041698d6-f43a-4b09-a39a-b90475a63530
 ```
 
-<<<<<<< HEAD:README.md
-which you can verify is correct in the above screenshot. The UUID is the last element of the URL. So in the above example it's,
-=======
 which you can verify is correct in the above screenshot. **This should be the full URL you enter into the script, for all other universities' echo system.**
->>>>>>> 210cab5 (renamed the module to a more generic name (as it works for all uni now)):Readme.md
 
 The UUID (Unified Unique IDentifier) is the last element of the URL. So in the above example it's,
 ```
