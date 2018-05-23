@@ -51,6 +51,11 @@ python echo360.py
 ### Script args ###
 ```
 >>> usage: echo360.py [-h] [--output OUTPUT_PATH]
+                  [--after-date AFTER_DATEYYYY-MM-DD)]
+                  [--before-date BEFORE_DATE(YYYY-MM-DD] [--unikey UNIKEY]
+                  [--password PASSWORD] [--download-phantomjs-binary]
+                  [--chrome] [--debug]
+                  ECHO360_URL
                       [--after-date AFTER_DATEYYYY-MM-DD)]
                       [--before-date BEFORE_DATE(YYYY-MM-DD] [--unikey UNIKEY]
                       [--password PASSWORD] [--download-phantomjs-binary]
@@ -87,10 +92,12 @@ optional arguments:
                         Your password for your University of Sydney elearning
                         account
   --download-phantomjs-binary
-                        Force the echo360.py script to download a local
-                        binary file for phantomjs (will override system bin)
+                        Force the echo360.py script to download a local binary
+                        file for phantomjs (will override system bin)
   --chrome              Use Chrome Driver instead of phantomjs webdriver. You
                         must have chromedriver installed in your PATH.
+  --debug               Enable extensive logging.
+
 
 ```
 # Examples #
