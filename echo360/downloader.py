@@ -1,8 +1,12 @@
+from __future__ import unicode_literals
 import dateutil.parser
 import os
 import sys
 import logging
 import re
+
+reload(sys)
+sys.setdefaultencoding('utf8')
 
 from echo360.hls_downloader import Downloader
 from echo360.exceptions import EchoLoginError
