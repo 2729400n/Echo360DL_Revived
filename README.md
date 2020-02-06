@@ -16,7 +16,7 @@ Updates as of 18/03/2018: It now will works on canvas echo360 as well (https://c
 # Getting Started #
 =======
 <p align="center">
-    <img width="700" height="auto" src="doc/images/demo.gif" alt="echo360 demo" />
+    <img width="700" height="auto" src="docs/images/demo.gif" alt="echo360 demo" />
 </p>
 >>>>>>> 10c1887 (added eye candy of gif demo):Readme.md
 
@@ -269,7 +269,7 @@ The variables `$(hostname)` and `$(UUID)` are what differentiate different Unive
 
 You should go to the main Echo360 Lecture page, which usually composed of all the lecturer recordings in a list format as shown below. It's the main page that lists all the recorded lectures and gives you the option to stream them or download them individually. This is important for downloading all the available videos from within the course.
 
-<img height="auto" src="doc/images/course_page.png" alt="echo360 course main page" />
+<img height="auto" src="docs/images/course_page.png" alt="echo360 course main page" />
 
 You can usually find this link on your course's main webpage. If your course webpage only links directly to videos, then you should be able to navigate back to the main portale via that link.
 
@@ -288,7 +288,7 @@ The UUID (Unified Unique IDentifier) is the last element of the URL. So in the a
 First, you'd need to install [Python](https://www.python.org/downloads/) in your system. Then, you can follow the youtube tutorial videos to get an idea of how to use the module.
 
 - For [Windows users](https://www.youtube.com/watch?v=Lv1wtjnCcwI) (and showcased how to retrieve actual echo360 course url)
-[![](/doc/images/youtube_win_tutorial.jpg)](https://www.youtube.com/watch?v=Lv1wtjnCcwI)
+[![](docs/images/youtube_win_tutorial.jpg)](https://www.youtube.com/watch?v=Lv1wtjnCcwI)
 
 ### My credentials does not work?
 
@@ -306,7 +306,7 @@ You are in luck! It is now possible to pick a subset of videos to download from 
 ```
 ...and it shall presents an interactive screen for you to pick each individual video(s) that you want to download, like the screenshot as shown below.
 
-<img src="/doc/images/pick_individual_videos_screenshot.png" width="650" height="auto" >
+<img src="/docs/images/pick_individual_videos_screenshot.png" width="650" height="auto" >
 
 ### Technical details
 
