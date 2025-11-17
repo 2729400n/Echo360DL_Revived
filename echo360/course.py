@@ -4,7 +4,10 @@ import sys
 
 import requests
 import selenium
+from selenium.webdriver import Chrome,Firefox,Edge
 import logging
+
+import selenium.common.exceptions
 
 from .videos import EchoVideos, EchoCloudVideos
 
@@ -17,10 +20,10 @@ class EchoCourse(object):
         self._course_name = None
         self._uuid = uuid
         self._videos = None
-        self._driver = None
+        self._driver:Chrome|Firefox = None
         self._alternative_feeds = alternative_feeds
         if hostname is None:
-            self._hostname = "https://view.streaming.sydney.edu.au:8443"
+            self._hostname = "https://echo360.org.uk:80/"
         else:
             self._hostname = hostname
 
@@ -215,3 +218,6 @@ class EchoCloudCourse(EchoCourse):
             raise Exception("Unable to retrieve JSON (course_data) from url", e)
         self.course_data = json.loads(json_str)
         return self.course_data
+
+
+
