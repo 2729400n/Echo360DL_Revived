@@ -139,7 +139,7 @@ class EchoVideo(object):
             return "1970-01-01"
 
     def _extract_date(self, video_json):
-        return video_json["startTime"]
+        return video_json["createdDate"]
 
     def _blow_up(self, str, e):
         print(str)
