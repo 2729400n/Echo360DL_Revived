@@ -19,24 +19,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import StaleElementReferenceException
 
 import logging
-from slugify import slugify
-import urllib3.util
 
-from .course import (EchoCourse,EchoCloudCourse,EchoVideos,EchoCloudVideos,_LOGGER)
-from .videos import EchoVideos, EchoCloudVideos,EchoCloudSubVideo,EchoVideo
-from .echo_exceptions import NotVideoError
+from .videos import EchoVideos, EchoCloudVideos
 
-from .hls_downloader import Downloader
-from .naive_m3u8_parser import NaiveM3U8Parser
-
-class MediaURL:
-    def __init__(self, url,mediaType,isHls,isLive,qualities=None):
-        self.url = url
-        self.mediaType = mediaType
-        self.isHls = isHls
-        self.isLive = isLive
-        self.qualities = qualities
-        
 
 def update_collection_retrieval_progress(current, total):
     prefix = ">> Retrieving echo360 Collection Info... "
@@ -81,9 +66,8 @@ class EchoCloudCollection(EchoCourse):
 
     @property
     def video_url(self):
-        sts= re.sub("(https?):/*","\\1://","{}/api/ui/groups/{}".format(self._hostname, self._uuid).replace("//","/").strip())
-        print(sts)
-        return sts
+        return "{}/api/ui/groups/{}".format(self._hostname, self._uuid).replace("//","/").strip()
+
     @property
     def course_id(self):
         if self._course_id is None:
@@ -95,7 +79,7 @@ class EchoCloudCollection(EchoCourse):
         if self._course_name is None:
             for v in self.course_data["data"]:
                 try:
-                    self._course_name:str = str(v["title"])
+                    self._course_name = v["title"]
                     break
                 except KeyError:
                     pass
@@ -128,63 +112,14 @@ class EchoCloudCollection(EchoCourse):
             if not r.ok:
                 raise Exception("Error: Failed to get m3u8 info for EchoCourse!")
 
-            json_str = r.text
+            json_str = r.json()
         except ValueError as e:
             raise Exception("Unable to retrieve JSON (course_data) from url", e)
         except json.JSONDecodeError as e:
             print("failed to get a json")
-        self.course_data = json.loads(json_str)
+        self.course_data = json_str
         return self.course_data
 
-class EchoCloudCollection(EchoCourse):
-    def __init__(self, *args, **kwargs):
-        super(EchoCloudCollection, self).__init__(*args, **kwargs)
-
-    def get_videos(self):
-        if self._driver is None:
-            raise Exception("webdriver not set yet!!!", "")
-        if not self._videos:
-            try:
-                course_data_json = self._get_course_data()
-                videos_json = course_data_json["data"]
-                self._videos = EchoCloudVideos(
-                    videos_json, self._driver, self.hostname, self._alternative_feeds
-                )
-            except selenium.common.exceptions.NoSuchElementException as e:
-                print("selenium cannot find given elements")
-                raise e
-
-        return self._videos
-
-    @property
-    def video_url(self):
-        return "{}/collections/api/ui/groups/{}".format(self._hostname, self._uuid)
-
-    @property
-    def course_id(self):
-        if self._course_id is None:
-            self._course_id = ""
-        return self._course_id
-
-    @property
-    def course_name(self):
-        if self._course_name is None:
-            # try each available video as some video might be special has contains
-            # no information about the course.
-            for v in self.course_data["data"]:
-                try:
-                    self._course_name = v["lesson"]["video"]["published"]["courseName"]
-                    break
-                except KeyError:
-                    pass
-            if self._course_name is None:
-                # no available course name found...?
-                self._course_name = "[[UNTITLED]]"
-        return self._course_name
-
-    @property
-    def videos(self):
-        return self._videos
 
 
 class EchoCloudCollectionVideo(EchoVideo):
