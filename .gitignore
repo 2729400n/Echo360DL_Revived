@@ -221,4 +221,8 @@ _browser_user_data_dir/
 __NOUPLOAD__/respvid.har
 .gitignore
 __NOUPLOAD__/collection_resp.har
+<<<<<<< HEAD
 >>>>>>> edb16f7 (Added some code to handle dealing with collection groups)
+=======
+__NOUPLOAD__/
+>>>>>>> 695440d (Updated Gitnore to not track no uploads directory)
