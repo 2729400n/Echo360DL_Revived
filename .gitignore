@@ -64,3 +64,4 @@ _browser_user_data_dir/
 __NOUPLOAD__/respvid.har
 .gitignore
 __NOUPLOAD__/collection_resp.har
+__NOUPLOAD__/
