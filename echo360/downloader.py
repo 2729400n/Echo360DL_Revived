@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 import dateutil.parser
 import os
+from pathlib import Path
 import sys
 import logging
 import re
@@ -72,8 +73,8 @@ def build_chrome_driver(
     if not setup_credential:
         opts.add_argument("--headless")
     if persistent_session:
-        folder_path = PERSISTENT_SESSION_FOLDER  # default current dir
-        opts.add_argument("--user-data-dir={}".format(folder_path))
+        folder_path =  Path(PERSISTENT_SESSION_FOLDER).absolute()  # default current dir
+        opts.add_argument("--user-data-dir='{}'".format(folder_path))
     opts.add_argument("--window-size=1920x1080")
     opts.add_argument("user-agent={}".format(user_agent))
 
@@ -114,39 +115,9 @@ def build_firefox_driver(
     log_path,
     persistent_session,
 ):
-    if persistent_session:
-        raise NotImplementedError(
+    raise NotImplementedError(
             "Save-login not implemented for Firefox! Feel free to make a PR for it..."
         )
-
-    profile = webdriver.FirefoxProfile()
-    profile.set_preference("general.useragent.override", user_agent)
-    kwargs = dict()
-
-    if selenium_version_ge_4100:
-        from selenium.webdriver.firefox.service import Service
-        from selenium.webdriver.firefox.options import Options
-
-        option = Options()
-        option.profile = profile
-
-        service = Service(**kwargs, log_file=log_path)
-        kwargs = dict(
-            service=service,
-            options=option,
-        )
-    else:
-        if use_local_binary:
-            from .binary_downloader.firefoxdriver import FirefoxDownloader
-
-            kwargs["executable_path"] = FirefoxDownloader().get_bin()
-        kwargs.update(
-            dict(
-                service_log_path=log_path,
-                firefox_profile=profile,
-            )
-        )
-    return webdriver.Firefox(**kwargs)
 
 
 def build_phantomjs_driver(
@@ -238,7 +209,7 @@ class EchoDownloader(object):
         self._driver = driver_builder(
             use_local_binary=use_local_binary,
             selenium_version_ge_4100=(
-                naive_versiontuple(selenium.__version__) >= naive_versiontuple("4.10.0")
+                naive_versiontuple(selenium.__version__)[:3] >= naive_versiontuple("4.10.0")
             ),
             setup_credential=setup_credential,
             user_agent=self._useragent,

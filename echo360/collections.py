@@ -1,289 +1,203 @@
-import os
+from course import (EchoCourse,EchoCloudCourse,EchoVideos,EchoCloudVideos,_LOGGER)
+import json
 import re
-
-import dateutil.parser
-import operator
 import sys
-import tqdm
 
-import ffmpy
 import requests
 import selenium
+import selenium.common.exceptions
+from selenium.webdriver import Chrome,Firefox,Edge
 import logging
 
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import StaleElementReferenceException
+from .videos import EchoVideos, EchoCloudVideos
 
-from .hls_downloader import Downloader
-from .naive_m3u8_parser import NaiveM3U8Parser
+class EchoCloudCollection(EchoCourse):
+    def __init__(self, *args, **kwargs):
+        super(EchoCloudCourse, self).__init__(*args, **kwargs)
 
-_LOGGER = logging.getLogger(__name__)
+    def get_videos(self):
+        if self._driver is None:
+            raise Exception("webdriver not set yet!!!", "")
+        if not self._videos:
+            try:
+                course_data_json = self._get_course_data()
+                videos_json = course_data_json["data"]
+                self._videos = EchoCloudVideos(
+                    videos_json, self._driver, self.hostname, self._alternative_feeds
+                )
+            # except KeyError as e:
+            #     print("Unable to parse course videos from JSON (course_data)")
+            #     raise e
+            except selenium.common.exceptions.NoSuchElementException as e:
+                print("selenium cannot find given elements")
+                raise e
 
-
-def update_course_retrieval_progress(current, total):
-    prefix = ">> Retrieving echo360 Course Info... "
-    status = "{}/{} videos".format(current, total)
-    text = "\r{0} {1} ".format(prefix, status)
-    sys.stdout.write(text)
-    sys.stdout.flush()
-    
-def update_collection_retrieval_progress(current, total):
-    prefix = ">> Retrieving echo360 Collection Info... "
-    status = "{}/{} videos".format(current, total)
-    text = "\r{0} {1} ".format(prefix, status)
-    sys.stdout.write(text)
-    sys.stdout.flush()
-
-class EchoVideos(object):
-    def __init__(self, videos_json, driver):
-        assert videos_json is not None
-        self._driver = driver
-        self._videos = []
-        total_videos_num = len(videos_json)
-        update_course_retrieval_progress(0, total_videos_num)
-
-        for i, video_json in enumerate(videos_json):
-            self._videos.append(EchoVideo(video_json, self._driver))
-            update_course_retrieval_progress(i + 1, total_videos_num)
-
-        self._videos.sort(key=operator.attrgetter("date"))
-
-    @property
-    def videos(self):
         return self._videos
 
-    def _blow_up(self, str, e):
-        print(str)
-        print("Exception: {}".format(str(e)))
-        sys.exit(1)
-
-
-class EchoVideo(object):
-    def __init__(self, video_json, driver):
-        self._driver = driver
-
-        try:
-            video_url = "{0}".format(video_json["richMedia"])
-            video_url = str(video_url)  # cast back to string
-
-            self._driver.get(video_url)
-            _LOGGER.debug(
-                "Dumping video page at %s: %s", video_url, self._driver.page_source
-            )
-
-            m3u8_url = self._loop_find_m3u8_url(video_url, waitsecond=30)
-            _LOGGER.debug("Found the following urls %s", m3u8_url)
-            self._url = m3u8_url
-
-            self._date = self.get_date(video_json["startTime"])
-            self._title = video_json["title"]
-
-        except KeyError as e:
-            self._blow_up("Unable to parse video data from JSON (course_data)", e)
-
-    def _loop_find_m3u8_url(self, video_url, waitsecond=15, max_attempts=5):
-        stale_attempt = 1
-        refresh_attempt = 1
-        while True:
-            self._driver.get(video_url)
-            try:
-                # wait for maximum second before timeout
-                WebDriverWait(self._driver, waitsecond).until(
-                    EC.presence_of_element_located((By.ID, "content-player"))
-                )
-                return (
-                    self._driver.find_element_by_id("content-player")
-                    .find_element_by_tag_name("video")
-                    .get_attribute("src")
-                )
-            except selenium.common.exceptions.TimeoutException:
-                if refresh_attempt >= max_attempts:
-                    print(
-                        "\r\nERROR: Connection timeouted after {} second for {} attempts... \
-                          Possibly internet problem?".format(
-                            waitsecond, max_attempts
-                        )
-                    )
-                    raise
-                refresh_attempt += 1
-            except StaleElementReferenceException:
-                if stale_attempt >= max_attempts:
-                    print(
-                        "\r\nERROR: Elements are not stable to retrieve after {} attempts... \
-                        Possibly internet problem?".format(
-                            max_attempts
-                        )
-                    )
-                    raise
-                stale_attempt += 1
-
-    @property
-    def date(self):
-        return self._date
-
-    @property
-    def url(self):
-        return self._url
-
-    @property
-    def title(self):
-        if type(self._title) != str:
-            # it's type unicode for python2
-            return self._title.encode("utf-8")
-        return self._title
-
-    def get_date(self, video_json):
-        try:
-            # date is not important so we will just ignore it if something went wrong
-            # Also, some echoCloud videos returns None for video start time... :(
-            date = dateutil.parser.parse(self._extract_date(video_json)).date()
-            return date.strftime("%Y-%m-%d")
-        except Exception:
-            return "1970-01-01"
-
-    def _extract_date(self, video_json):
-        return video_json["startTime"]
-
-    def _blow_up(self, str, e):
-        print(str)
-        print("Exception: {}".format(str(e)))
-        sys.exit(1)
-
-    def download(self, output_dir, filename, pool_size=50):
-        print("")
-        print("-" * 60)
-        print('Downloading "{}"'.format(filename))
-        self._download_url_to_dir(self.url, output_dir, filename, pool_size)
-        print("-" * 60)
-        return True
-
-    def _download_url_to_dir(
-        self, url, output_dir, filename, pool_size, convert_to_mp4=True
-    ):
-        echo360_downloader = Downloader(
-            pool_size, selenium_cookies=self._driver.get_cookies()
-        )
-        echo360_downloader.run(url, output_dir, convert_to_mp4=convert_to_mp4)
-
-        # rename file
-        ext = echo360_downloader.result_file_name.split(".")[-1]
-        result_full_path = os.path.join(output_dir, "{0}.{1}".format(filename, ext))
-        os.rename(os.path.join(echo360_downloader.result_file_name), result_full_path)
-        return result_full_path
-
-    def _download_url_to_dir_request(self, session, url, output_dir, filename):
-        ext = url.split(".")[-1]
-
-        r = session.get(url, stream=True)
-        total_size = int(r.headers.get("content-length", 0))
-        block_size = 1024  # 1 kilobyte
-        result_full_path = os.path.join(output_dir, filename + ext)
-        with tqdm.tqdm(total=total_size, unit="iB", unit_scale=True) as pbar:
-            with open(result_full_path, "wb") as f:
-                for data in r.iter_content(block_size):
-                    pbar.update(len(data))
-                    f.write(data)
-        return result_full_path
-
-    def get_all_parts(self):
-        return [self]
-    
-
-class EchoCloudCollectionVideoGroups(EchoVideos):
-    def __init__(
-        self, videos_json, driver, hostname, alternative_feeds, skip_video_on_error=True
-    ):
-        assert videos_json is not None
-        self._driver = driver
-        self._videos = []
-        total_videos_num = len(videos_json)
-        update_collection_retrieval_progress(0, total_videos_num)
-
-        for i, video_json in enumerate(videos_json):
-            try:
-                self._videos.append(
-                    EchoCloudCollectionVideos(
-                        video_json["content"], self._driver, hostname, alternative_feeds, is_collection=True
-                    )
-                )
-            except Exception:
-                if not skip_video_on_error:
-                    raise
-            update_collection_retrieval_progress(i + 1, total_videos_num)
-
-        self._videos.sort(key=operator.attrgetter("date"))
-
-    @property
-    def videos(self):
-        return self._videos
-    
-
-class EchoCloudCollectionVideos(EchoVideos):
-    def __init__(
-        self, videos_json, driver, hostname, alternative_feeds, skip_video_on_error=True
-    ):
-        assert videos_json is not None
-        self._driver = driver
-        self._videos = []
-        total_videos_num = len(videos_json)
-        update_collection_retrieval_progress(0, total_videos_num)
-
-        for i, video_json in enumerate(videos_json):
-            try:
-                self._videos.append(
-                    EchoCloudCollectionVideo(
-                        video_json, self._driver, hostname, alternative_feeds, is_collection=True
-                    )
-                )
-            except Exception:
-                if not skip_video_on_error:
-                    raise
-            update_collection_retrieval_progress(i + 1, total_videos_num)
-
-        self._videos.sort(key=operator.attrgetter("date"))
-
-    @property
-    def videos(self):
-        return self._videos
-
-
-class EchoCloudVideos(EchoVideos):
-    def __init__(
-        self, videos_json, driver, hostname, alternative_feeds, skip_video_on_error=True, is_collection:bool=False
-    ):
-        assert videos_json is not None
-        self._driver = driver
-        self._videos = []
-        total_videos_num = len(videos_json)
-        update_course_retrieval_progress(0, total_videos_num)
-
-        for i, video_json in enumerate(videos_json):
-            try:
-                self._videos.append(
-                    EchoCloudVideo(
-                        video_json, self._driver, hostname, alternative_feeds
-                    )
-                )
-            except Exception:
-                if not skip_video_on_error:
-                    raise
-            update_course_retrieval_progress(i + 1, total_videos_num)
-
-        self._videos.sort(key=operator.attrgetter("date"))
-
-    @property
-    def videos(self):
-        return self._videos
-
-
-class EchoCloudVideo(EchoVideo):
     @property
     def video_url(self):
-        return "{}/lesson/{}/classroom".format(self.hostname, self.video_id)
+        return "{}/collections/api/ui/groups/{}".format(self._hostname, self._uuid)
 
-    def __init__(self, video_json, driver, hostname, alternative_feeds):
+    @property
+    def course_id(self):
+        if self._course_id is None:
+            # self.course_data['data'][0]['lesson']['lesson']['displayName']
+            # should be in the format of XXXXX (ABCD1001 - 2020 - Semester 1) ???
+            # canidate = self.course_data['data'][0]['lesson']['video']['published']['courseName']
+            # print(self._course_name)
+            # self._course_name = canidate
+            # Too much variant, it's too hard to have a unique way to extract course id.
+            # we will simply use course name and ignore any course id.
+            self._course_id = ""
+            # result = re.search('^[^(]+', canidate)
+            # if result is not None:
+            #     self._course_name = result.group()
+            #     result = re.search('[(].+[)]', canidate)
+            #     self._course_id = result.group()[1:-1]
+        return self._course_id
+
+    @property
+    def course_name(self):
+        if self._course_name is None:
+            # try each available video as some video might be special has contains
+            # no information about the course.
+            for v in self.course_data["data"]:
+                try:
+                    self._course_name = v["lesson"]["video"]["published"]["courseName"]
+                    break
+                except KeyError:
+                    pass
+            if self._course_name is None:
+                # no available course name found...?
+                self._course_name = "[[UNTITLED]]"
+        return self._course_name
+
+    @property
+    def nice_name(self):
+        return self.course_name
+
+    def _get_course_data(self):
+        try:
+            self.driver.get(self.video_url)
+            _LOGGER.debug(
+                "Dumping course page at %s: %s",
+                self.video_url,
+                self._driver.page_source,
+            )
+            # use requests to retrieve data
+            session = requests.Session()
+            # load cookies
+            for cookie in self.driver.get_cookies():
+                session.cookies.set(cookie["name"], cookie["value"])
+
+            r = session.get(self.video_url)
+            if not r.ok:
+                raise Exception("Error: Failed to get m3u8 info for EchoCourse!")
+
+            json_str = r.text
+        except ValueError as e:
+            raise Exception("Unable to retrieve JSON (course_data) from url", e)
+        self.course_data = json.loads(json_str)
+        return self.course_data
+
+class EchoCloudCollection(EchoCourse):
+    def __init__(self, *args, **kwargs):
+        super(EchoCloudCollection, self).__init__(*args, **kwargs)
+
+    def get_videos(self):
+        if self._driver is None:
+            raise Exception("webdriver not set yet!!!", "")
+        if not self._videos:
+            try:
+                course_data_json = self._get_course_data()
+                videos_json = course_data_json["data"]
+                self._videos = EchoCloudVideos(
+                    videos_json, self._driver, self.hostname, self._alternative_feeds
+                )
+            # except KeyError as e:
+            #     print("Unable to parse course videos from JSON (course_data)")
+            #     raise e
+            except selenium.common.exceptions.NoSuchElementException as e:
+                print("selenium cannot find given elements")
+                raise e
+
+        return self._videos
+
+    @property
+    def video_url(self):
+        return "{}/collections/api/ui/groups/{}".format(self._hostname, self._uuid)
+
+    @property
+    def course_id(self):
+        if self._course_id is None:
+            # self.course_data['data'][0]['lesson']['lesson']['displayName']
+            # should be in the format of XXXXX (ABCD1001 - 2020 - Semester 1) ???
+            # canidate = self.course_data['data'][0]['lesson']['video']['published']['courseName']
+            # print(self._course_name)
+            # self._course_name = canidate
+            # Too much variant, it's too hard to have a unique way to extract course id.
+            # we will simply use course name and ignore any course id.
+            self._course_id = ""
+            # result = re.search('^[^(]+', canidate)
+            # if result is not None:
+            #     self._course_name = result.group()
+            #     result = re.search('[(].+[)]', canidate)
+            #     self._course_id = result.group()[1:-1]
+        return self._course_id
+
+    @property
+    def course_name(self):
+        if self._course_name is None:
+            # try each available video as some video might be special has contains
+            # no information about the course.
+            for v in self.course_data["data"]:
+                try:
+                    self._course_name = v["lesson"]["video"]["published"]["courseName"]
+                    break
+                except KeyError:
+                    pass
+            if self._course_name is None:
+                # no available course name found...?
+                self._course_name = "[[UNTITLED]]"
+        return self._course_name
+
+    @property
+    def nice_name(self):
+        return self.course_name
+
+    def _get_course_data(self):
+        try:
+            self.driver.get(self.video_url)
+            _LOGGER.debug(
+                "Dumping course page at %s: %s",
+                self.video_url,
+                self._driver.page_source,
+            )
+            # use requests to retrieve data
+            session = requests.Session()
+            # load cookies
+            for cookie in self.driver.get_cookies():
+                session.cookies.set(cookie["name"], cookie["value"])
+
+            r = session.get(self.video_url)
+            if not r.ok:
+                raise Exception("Error: Failed to get m3u8 info for EchoCourse!")
+
+            json_str = r.text
+        except ValueError as e:
+            raise Exception("Unable to retrieve JSON (course_data) from url", e)
+        self.course_data = json.loads(json_str)
+        return self.course_data
+
+class EchoCloudCollectionVideo(EchoVideo):
+    
+    # TODO: Cach JSON to reduce network load
+    _video_url_cache
+    @property
+    def video_url(self):
+        return "{}/api/ui/groups/{}/media/{}?".format(self.hostname, self.video_id)
+
+    def __init__(self, video_json, driver, hostname, alternative_feeds, collection_id):
         self.hostname = hostname
         self._driver = driver
         self.video_json = video_json
@@ -626,23 +540,3 @@ class EchoCloudVideo(EchoVideo):
 
     def get_all_parts(self):
         return self.sub_videos
-    
-    
-
-
-
-class EchoCloudSubVideo(EchoCloudVideo):
-    """Some video in echo360 cloud is multi-part and this represents it."""
-
-    def __init__(self, video_json, driver, hostname, group_name, alternative_feeds):
-        super(EchoCloudSubVideo, self).__init__(
-            video_json, driver, hostname, alternative_feeds
-        )
-        self.group_name = group_name
-
-    @property
-    def title(self):
-        if type(self._title) != str:
-            # it's type unicode for python2
-            self._title = self._title.encode("utf-8")
-        return "{} - {}".format(self.group_name, self._title)

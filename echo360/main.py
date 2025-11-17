@@ -14,11 +14,12 @@ except ImportError as e:
     if "win32" not in sys.platform:
         raise e
     import subprocess
-
     subprocess.check_call([sys.executable, "-m", "pip", "install", "windows-curses"])
 
 from .echo_exceptions import EchoLoginError
+
 from .downloader import EchoDownloader
+
 from .course import EchoCourse, EchoCloudCourse
 from .utils import PERSISTENT_SESSION_FOLDER
 
@@ -361,6 +362,7 @@ def main():
             "[^/]+(?=/$|$)", course_url
         ).group()  # retrieve the last part of the URL
         course = EchoCourse(course_uuid, course_hostname)
+        
     downloader = EchoDownloader(
         course,
         output_path,

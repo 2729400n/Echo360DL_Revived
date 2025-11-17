@@ -1,5 +1,7 @@
 _echo360venv
+_browser_persistent_session/
 
+*.whl
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -2,6 +2,7 @@ import ffmpy
 import gevent
 from gevent.pool import Pool
 import requests
+import requests.adapters
 import os, sys
 import time
 import tqdm

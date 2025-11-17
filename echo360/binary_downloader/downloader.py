@@ -10,6 +10,15 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class BinaryDownloader(object):
+    
+    _os_linux_32 :str
+    _os_linux_64 :str
+    _os_windows_32 :str
+    _os_windows_64 :str
+    _os_darwin_32 :str
+    _os_darwin_64 :str
+    _os_darwin_arm:str
+    _name:str
     def __init__(self):
         raise NotImplementedError
 
@@ -45,6 +54,10 @@ class BinaryDownloader(object):
     def get_bin(self):
         raise NotImplementedError
 
+    @property
+    def Name(self):
+        return self._name
+    
     def download(self):
         print(
             '>> Downloading {0} binary file for "{1}"'.format(
