@@ -215,4 +215,10 @@ __marimo__/
 bin/
 default_out_path/
 _browser_user_data_dir/
+<<<<<<< HEAD
 >>>>>>> 401c367 (ignore persistent folder)
+=======
+__NOUPLOAD__/respvid.har
+.gitignore
+__NOUPLOAD__/collection_resp.har
+>>>>>>> edb16f7 (Added some code to handle dealing with collection groups)
