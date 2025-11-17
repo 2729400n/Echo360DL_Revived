@@ -1,6 +1,13 @@
+<<<<<<< HEAD
 <<<<<<< HEAD:README.md
 # USYDecho360 #
 =======
+=======
+# Echo360DL_Revived
+A revision of the Echo360DL by soraxas
+
+
+>>>>>>> f152785 (Initial commit)
 # Echo360 Videos Downloader
 >>>>>>> 10c1887 (added eye candy of gif demo):Readme.md
 
