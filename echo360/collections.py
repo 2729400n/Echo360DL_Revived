@@ -11,9 +11,27 @@ import logging
 
 from .videos import EchoVideos, EchoCloudVideos
 
+
+def update_collection_retrieval_progress(current, total):
+    prefix = ">> Retrieving echo360 Collection Info... "
+    status = "{}/{} videos".format(current, total)
+    text = "\r{0} {1} ".format(prefix, status)
+    sys.stdout.write(text)
+    sys.stdout.flush()
+
 class EchoCloudCollection(EchoCourse):
-    def __init__(self, *args, **kwargs):
-        super(EchoCloudCourse, self).__init__(*args, **kwargs)
+    def __init__(self, uuid, hostname=None, alternative_feeds=False):
+        self._course_id = uuid
+        self._course_name = None
+        self._uuid = uuid
+        self._videos = None
+        self._driver:Chrome|Firefox = None
+        self._alternative_feeds = alternative_feeds
+        if hostname is None:
+            self._hostname = "https://echo360.org.uk/"
+        else:
+            self._hostname = hostname
+        self._hostname = self._hostname.rstrip("/")
 
     def get_videos(self):
         if self._driver is None:
@@ -33,7 +51,7 @@ class EchoCloudCollection(EchoCourse):
 
     @property
     def video_url(self):
-        return "{}/collections/api/ui/groups/{}".format(self._hostname, self._uuid)
+        return "{}/api/ui/groups/{}".format(self._hostname, self._uuid).replace("//","/").strip()
 
     @property
     def course_id(self):
@@ -46,13 +64,13 @@ class EchoCloudCollection(EchoCourse):
         if self._course_name is None:
             for v in self.course_data["data"]:
                 try:
-                    self._course_name = v["lesson"]["video"]["published"]["courseName"]
+                    self._course_name = v["title"]
                     break
                 except KeyError:
                     pass
             if self._course_name is None:
                 # no available course name found...?
-                self._course_name = "[[UNTITLED]]"
+                self._course_name = "[[UNTITLED_COLLECTION]]"
         return self._course_name
 
     @property
@@ -62,6 +80,7 @@ class EchoCloudCollection(EchoCourse):
     def _get_course_data(self):
         try:
             self.driver.get(self.video_url)
+            
             _LOGGER.debug(
                 "Dumping course page at %s: %s",
                 self.video_url,
@@ -77,85 +96,15 @@ class EchoCloudCollection(EchoCourse):
             if not r.ok:
                 raise Exception("Error: Failed to get m3u8 info for EchoCourse!")
 
-            json_str = r.text
+            json_str = r.json()
         except ValueError as e:
             raise Exception("Unable to retrieve JSON (course_data) from url", e)
-        self.course_data = json.loads(json_str)
+        except json.JSONDecodeError as e:
+            print("failed to get a json")
+        self.course_data = json_str
         return self.course_data
 
-class EchoCloudCollection(EchoCourse):
-    def __init__(self, *args, **kwargs):
-        super(EchoCloudCollection, self).__init__(*args, **kwargs)
 
-    def get_videos(self):
-        if self._driver is None:
-            raise Exception("webdriver not set yet!!!", "")
-        if not self._videos:
-            try:
-                course_data_json = self._get_course_data()
-                videos_json = course_data_json["data"]
-                self._videos = EchoCloudVideos(
-                    videos_json, self._driver, self.hostname, self._alternative_feeds
-                )
-            except selenium.common.exceptions.NoSuchElementException as e:
-                print("selenium cannot find given elements")
-                raise e
-
-        return self._videos
-
-    @property
-    def video_url(self):
-        return "{}/collections/api/ui/groups/{}".format(self._hostname, self._uuid)
-
-    @property
-    def course_id(self):
-        if self._course_id is None:
-            self._course_id = ""
-        return self._course_id
-
-    @property
-    def course_name(self):
-        if self._course_name is None:
-            # try each available video as some video might be special has contains
-            # no information about the course.
-            for v in self.course_data["data"]:
-                try:
-                    self._course_name = v["lesson"]["video"]["published"]["courseName"]
-                    break
-                except KeyError:
-                    pass
-            if self._course_name is None:
-                # no available course name found...?
-                self._course_name = "[[UNTITLED]]"
-        return self._course_name
-
-    @property
-    def nice_name(self):
-        return self.course_name
-
-    def _get_course_data(self):
-        try:
-            self.driver.get(self.video_url)
-            _LOGGER.debug(
-                "Dumping course page at %s: %s",
-                self.video_url,
-                self._driver.page_source,
-            )
-            # use requests to retrieve data
-            session = requests.Session()
-            # load cookies
-            for cookie in self.driver.get_cookies():
-                session.cookies.set(cookie["name"], cookie["value"])
-
-            r = session.get(self.video_url)
-            if not r.ok:
-                raise Exception("Error: Failed to get m3u8 info for EchoCourse!")
-
-            json_str = r.text
-        except ValueError as e:
-            raise Exception("Unable to retrieve JSON (course_data) from url", e)
-        self.course_data = json.loads(json_str)
-        return self.course_data
 
 class EchoCloudCollectionVideo(EchoVideo):
     
