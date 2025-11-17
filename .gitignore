@@ -61,3 +61,6 @@ target/
 bin/
 default_out_path/
 _browser_user_data_dir/
+__NOUPLOAD__/respvid.har
+.gitignore
+__NOUPLOAD__/collection_resp.har

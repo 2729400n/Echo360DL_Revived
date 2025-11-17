@@ -1,15 +1,22 @@
-from course import (EchoCourse,EchoCloudCourse,EchoVideos,EchoCloudVideos,_LOGGER)
+from datetime import datetime
+import operator
+
 import json
 import re
 import sys
+import os
+import ffmpy
 
 import requests
 import selenium
 import selenium.common.exceptions
 from selenium.webdriver import Chrome,Firefox,Edge
 import logging
+from slugify import slugify
 
-from .videos import EchoVideos, EchoCloudVideos
+from .course import (EchoCourse,EchoCloudCourse,EchoVideos,EchoCloudVideos,_LOGGER)
+from .videos import EchoVideos, EchoCloudVideos,EchoCloudSubVideo,EchoVideo
+from .echo_exceptions import NotVideoError
 
 
 def update_collection_retrieval_progress(current, total):
@@ -39,9 +46,9 @@ class EchoCloudCollection(EchoCourse):
         if not self._videos:
             try:
                 course_data_json = self._get_course_data()
-                videos_json = course_data_json["data"]
+                videos_json = course_data_json
                 self._videos = EchoCloudCollectionVideoGroups(
-                    videos_json, self._driver, self.hostname, self._alternative_feeds
+                    videos_json["data"], self._driver, self.hostname, self._alternative_feeds
                 )
             except selenium.common.exceptions.NoSuchElementException as e:
                 print("selenium cannot find given elements")
@@ -64,7 +71,7 @@ class EchoCloudCollection(EchoCourse):
         if self._course_name is None:
             for v in self.course_data["data"]:
                 try:
-                    self._course_name = v["title"]
+                    self._course_name:str = str(v["title"])
                     break
                 except KeyError:
                     pass
@@ -75,7 +82,8 @@ class EchoCloudCollection(EchoCourse):
 
     @property
     def nice_name(self):
-        return self.course_name
+        # Slugify to meet web Standards
+        return slugify(self.course_name,lowercase=False,separator="_")
 
     def _get_course_data(self):
         try:
@@ -106,41 +114,103 @@ class EchoCloudCollection(EchoCourse):
 
 
 
+
+    
+    
+    
+class EchoCloudCollectionVideoGroups(EchoVideos):
+    def __init__(
+        self, videos_json:list[dict], driver:"Chrome|Edge", hostname:str, alternative_feeds:bool, skip_video_on_error:bool=True
+    ):
+        assert videos_json is not None
+        
+        self._driver = driver
+        self._videos = []
+        total_videos_num = len(videos_json)
+        update_collection_retrieval_progress(0, total_videos_num)
+
+        for i, video_json in enumerate(videos_json):
+            try:
+                self._videos.append(
+                    EchoCloudCollectionVideos(
+                        video_json["content"], self._driver, hostname, alternative_feeds, is_collection=True
+                    )
+                )
+            except Exception:
+                if not skip_video_on_error:
+                    raise
+            update_collection_retrieval_progress(i + 1, total_videos_num)
+
+        self._videos.sort(key=operator.attrgetter("date"))
+
+    @property
+    def videos(self):
+        return self._videos
+    
+
+class EchoCloudCollectionVideos(EchoVideos):
+    def __init__(
+        self, videos_json:list[dict], driver:"Chrome|Edge", hostname:str, alternative_feeds:bool, skip_video_on_error:bool=True
+    ):
+        assert videos_json is not None
+        self._driver = driver
+        self._videos = []
+        total_videos_num = len(videos_json)
+        
+        update_collection_retrieval_progress(0, total_videos_num)
+
+        for i, video_json in enumerate(videos_json):
+            try:
+                self._videos.append(
+                    EchoCloudCollectionVideo(
+                        video_json, self._driver, hostname, alternative_feeds, is_collection=True
+                    )
+                )
+            except NotVideoError as e:
+                continue
+            except Exception:
+                if not skip_video_on_error:
+                    raise
+            update_collection_retrieval_progress(i + 1, total_videos_num)
+
+        self._videos.sort(key=operator.attrgetter("date"))
+
+    @property
+    def videos(self):
+        return self._videos
+
+
 class EchoCloudCollectionVideo(EchoVideo):
     
     # TODO: Cach JSON to reduce network load
-    _video_url_cache
     @property
     def video_url(self):
-        return "{}/api/ui/groups/{}/media/{}?".format(self.hostname, self.video_id)
+        return "{}/api/ui/groups/{}/media/{}".format(self.hostname, self.collection_id,self.video_id)
+    
+    @property
+    def date(self)->datetime:
+        return datetime.fromisoformat(self._date)
 
-    def __init__(self, video_json, driver, hostname, alternative_feeds, collection_id):
-        self.hostname = hostname
+    def __init__(self, video_json:dict[str], driver:Chrome|Firefox, hostname:str , alternative_feeds:bool, collection_id:str):
+        
+        if(str(video_json["mediaType"]).strip().lower()!="video"):
+            raise NotVideoError("Not a Video")
+        
+        self.hostname= hostname
         self._driver = driver
         self.video_json = video_json
+        self._video_id =str(video_json["id"])
+        self._date = str(video_json["createdDate"])
         self.is_multipart_video = False
         self.sub_videos = [self]
         self.download_alternative_feeds = alternative_feeds
-        if "lessons" in video_json:
-            # IS a multi-part lesson.
-            self.sub_videos = [
-                EchoCloudSubVideo(
-                    sub_video_json,
-                    driver,
-                    hostname,
-                    group_name=video_json["groupInfo"]["name"],
-                    alternative_feeds=alternative_feeds,
-                )
-                for sub_video_json in video_json["lessons"]
-            ]
-            self.is_multipart_video = True
-            # THIS OBJECT SHOULD NOT BE USED ANYMORE as no further
-            # processing will be proceeded.
-            self._date = self.get_date(video_json)
-            return
+        
+        
 
-        video_id = "{0}".format(video_json["lesson"]["lesson"]["id"])
+        video_id = "{0}".format(video_json["id"])
         self.video_id = str(video_id)  # cast back to string
+        
+        self.collection_id = str(collection_id)
 
         self._driver.get(self.video_url)
         _LOGGER.debug(
@@ -148,6 +218,7 @@ class EchoCloudCollectionVideo(EchoVideo):
         )
 
         m3u8_url = self._loop_find_m3u8_url(self.video_url, waitsecond=30)
+        
         _LOGGER.debug("Found the following urls %s", m3u8_url)
         self._url = m3u8_url
 
@@ -301,6 +372,7 @@ class EchoCloudCollectionVideo(EchoVideo):
         return True
 
     def _loop_find_m3u8_url(self, video_url, waitsecond=15, max_attempts=5):
+        
         def brute_force_get_url(suffix):
             # this is the first method I tried, which sort of works
             stale_attempt = 1
@@ -311,7 +383,7 @@ class EchoCloudCollectionVideo(EchoVideo):
                     # the replace is for reversing the escape by the escapped js in the page source
                     urls = set(
                         re.findall(
-                            'https://[^,"]*?[.]{}'.format(suffix),
+                            'http(s?)://[^,"]*?[.]{}'.format(suffix),
                             self._driver.page_source.replace("\/", "/"),
                         )
                     )
@@ -457,62 +529,3 @@ class EchoCloudCollectionVideo(EchoVideo):
 
     def get_all_parts(self):
         return self.sub_videos
-    
-    
-    
-class EchoCloudCollectionVideoGroups(EchoVideos):
-    def __init__(
-        self, videos_json, driver, hostname, alternative_feeds, skip_video_on_error=True
-    ):
-        assert videos_json is not None
-        self._driver = driver
-        self._videos = []
-        total_videos_num = len(videos_json)
-        update_collection_retrieval_progress(0, total_videos_num)
-
-        for i, video_json in enumerate(videos_json):
-            try:
-                self._videos.append(
-                    EchoCloudCollectionVideos(
-                        video_json["content"], self._driver, hostname, alternative_feeds, is_collection=True
-                    )
-                )
-            except Exception:
-                if not skip_video_on_error:
-                    raise
-            update_collection_retrieval_progress(i + 1, total_videos_num)
-
-        self._videos.sort(key=operator.attrgetter("date"))
-
-    @property
-    def videos(self):
-        return self._videos
-    
-
-class EchoCloudCollectionVideos(EchoVideos):
-    def __init__(
-        self, videos_json, driver, hostname, alternative_feeds, skip_video_on_error=True
-    ):
-        assert videos_json is not None
-        self._driver = driver
-        self._videos = []
-        total_videos_num = len(videos_json)
-        update_collection_retrieval_progress(0, total_videos_num)
-
-        for i, video_json in enumerate(videos_json):
-            try:
-                self._videos.append(
-                    EchoCloudCollectionVideo(
-                        video_json, self._driver, hostname, alternative_feeds, is_collection=True
-                    )
-                )
-            except Exception:
-                if not skip_video_on_error:
-                    raise
-            update_collection_retrieval_progress(i + 1, total_videos_num)
-
-        self._videos.sort(key=operator.attrgetter("date"))
-
-    @property
-    def videos(self):
-        return self._videos

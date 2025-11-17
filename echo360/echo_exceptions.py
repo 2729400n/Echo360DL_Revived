@@ -5,3 +5,7 @@ class EchoLoginError(Exception):
 
 class HlsDownloaderError(Exception):
     pass
+
+
+class NotVideoError(Exception):
+    pass
