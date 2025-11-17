@@ -3,14 +3,21 @@ import operator
 
 import json
 import re
+import shutil
 import sys
 import os
 import ffmpy
 
 import requests
+
 import selenium
 import selenium.common.exceptions
 from selenium.webdriver import Chrome,Firefox,Edge
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import StaleElementReferenceException
+
 import logging
 from slugify import slugify
 
@@ -18,6 +25,14 @@ from .course import (EchoCourse,EchoCloudCourse,EchoVideos,EchoCloudVideos,_LOGG
 from .videos import EchoVideos, EchoCloudVideos,EchoCloudSubVideo,EchoVideo
 from .echo_exceptions import NotVideoError
 
+class MediaURL:
+    def __init__(self, url,mediaType,isHls,isLive,qualities=None):
+        self.url = url
+        self.mediaType = mediaType
+        self.isHls = isHls
+        self.isLive = isLive
+        self.qualities = qualities
+        
 
 def update_collection_retrieval_progress(current, total):
     prefix = ">> Retrieving echo360 Collection Info... "
@@ -227,7 +242,13 @@ class EchoCloudCollectionVideo(EchoVideo):
 
     def download(self, output_dir, filename, pool_size=50):
         print("")
-        print("-" * 60)
+        
+        if(sys.stdout.isatty()):
+            col =shutil.get_terminal_size((60,24)).columns
+        else:
+            col=60
+            
+        print("-" * col)
         print('Downloading "{}"'.format(filename))
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
@@ -373,20 +394,27 @@ class EchoCloudCollectionVideo(EchoVideo):
 
     def _loop_find_m3u8_url(self, video_url, waitsecond=15, max_attempts=5):
         
-        def brute_force_get_url(suffix):
+        def brute_force_get_url():
             # this is the first method I tried, which sort of works
             stale_attempt = 1
             refresh_attempt = 1
             while True:
                 self._driver.get(video_url)
                 try:
-                    # the replace is for reversing the escape by the escapped js in the page source
-                    urls = set(
-                        re.findall(
-                            'http(s?)://[^,"]*?[.]{}'.format(suffix),
-                            self._driver.page_source.replace("\/", "/"),
-                        )
-                    )
+                    dats =json.loads(self._driver.page_source.replace("\\/", "/")),
+                    data=dats["data"]
+                    playbackInfo:dict[str] = data["playbackInfo"]["playbackInfo"]
+                    playables:list[dict] = playbackInfo.get("playableMedias")
+                    if(playables is None):
+                        return []
+                    urls:list[MediaURL] =[]
+                    for playable in playables:
+                        isHls:bool =  playables["isHls"]
+                        isLive:bool =  playables["isLive"]
+                        mediaUrl = playables["uri"]
+                        trackType = playables["trackType"]
+                        quality = playable.get("quality")
+                        urls+=[MediaURL(mediaUrl,trackType,isHls,isLive,quality)]
                     return urls
 
                 except selenium.common.exceptions.TimeoutException:
@@ -412,7 +440,7 @@ class EchoCloudCollectionVideo(EchoVideo):
 
         def brute_force_get_mp4_url():
             """Forcefully try to find all .mp4 url in the page source"""
-            urls = brute_force_get_url(suffix="mp4")
+            urls = brute_force_get_url()
             if len(urls) == 0:
                 raise Exception("None were found.")
             # in many cases, there would be urls in the format of http://xxx.{hd1,hd2,sd1,sd2}
@@ -422,62 +450,14 @@ class EchoCloudCollectionVideo(EchoVideo):
             # to download both feeds.
             # Let's prioritise hd over sd, and 1 over 2 (the latter is arbitary)
             # which happens to be the natual order of letter anyway, so we can simply use sorted.
-            return sorted(urls)[:2]
+            return sorted(urls,key=lambda x : x.url)[:3]
 
-        def from_json_m3u8():
-            # seems like json would also contain that information so this method tries
-            # to retrieve based on that
-            if (
-                not self.video_json["lesson"]["hasVideo"]
-                or not self.video_json["lesson"]["hasAvailableVideo"]
-            ):
-                return False
 
-            manifests = self.video_json["lesson"]["video"]["media"]["media"][
-                "versions"
-            ][0]["manifests"]
-            m3u8urls = [m["uri"] for m in manifests]
-            # somehow the hostname for these urls are from amazon (probably offloading
-            # to them.) We need to set the host back to echo360.org
-            try:
-                # python3
-                from urllib.parse import urlparse
-            except ImportError:
-                # python2
-                from urlparse import urlparse
-            new_m3u8urls = []
-            new_hostname = urlparse(self.hostname).netloc
-            for url in m3u8urls:
-                parse_result = urlparse(url)
-                new_m3u8urls.append(
-                    "{}://content.{}{}".format(
-                        parse_result.scheme, new_hostname, parse_result.path
-                    )
-                )
-            return new_m3u8urls
-
-        def from_json_mp4():
-            mp4_files = self.video_json["lesson"]["video"]["media"]["media"]["current"][
-                "primaryFiles"
-            ]
-            urls = [obj["s3Url"] for obj in mp4_files]
-            if len(urls) == 0:
-                raise ValueError("Cannot find mp4 urls")
-            # usually hd is the last one. so we will sort in reverse order
-            return next(reversed(urls))
 
         # try different methods in series, first the preferred ones, then the more
         # obscure ones.
-        try:
-            _LOGGER.debug("Trying from_json_mp4 method")
-            return from_json_mp4()
-        except Exception as e:
-            _LOGGER.debug("Encountered exception: {}".format(e))
-        try:
-            _LOGGER.debug("Trying from_json_m3u8 method")
-            m3u8urls = from_json_m3u8()
-        except Exception as e:
-            _LOGGER.debug("Encountered exception: {}".format(e))
+        
+        
         try:
             _LOGGER.debug("Trying brute_force_all_mp4 method")
             return brute_force_get_mp4_url()
@@ -492,34 +472,10 @@ class EchoCloudCollectionVideo(EchoVideo):
             print("Tried all methods to retrieve videos but all had failed!")
             raise
 
-        # find one that has audio + video
-        m3u8urls = [url for url in m3u8urls if url.endswith("av.m3u8")]
-        if len(m3u8urls) == 0:
-            print(
-                "No audio+video m3u8 files found! Skipping...\n"
-                "This can either be (i) Credential failure? (ii) Logic error "
-                "in the script. (iii) This lecture only provides audio?\n"
-                "This script is hard-coded to download audio+video. "
-                "If this is your intended behaviour, "
-                "please contact the author."
-            )
-            return False
-        # There could exists multiple m3u8 files
-        # (e.g. .../s1_av.m3u8, .../s2_av.m3u8, etc.) Probably to refer to
-        # different quality?? We will set it to always prefer higher number.
-        # Since (from my experiment) the prefixes are always the same, we will
-        # just use text sorting to get the higher number.
-        # Some university have two different video feeds, use flag `-a` to
-        # download both feeds.
-        m3u8urls = list(reversed(m3u8urls))
-        return m3u8urls[:2]
-
     def _extract_date(self, video_json):
         if self.is_multipart_video:
-            if video_json["groupInfo"]["createdAt"] is not None:
-                return video_json["groupInfo"]["createdAt"]
-            if video_json["groupInfo"]["u'updatedAt'"] is not None:
-                return video_json["groupInfo"]["u'updatedAt'"]
+            if video_json["groupContent"]["createdDate"] is not None:
+                return video_json["groupContent"]["createdDate"]
 
         if "startTimeUTC" in video_json["lesson"]:
             if video_json["lesson"]["startTimeUTC"] is not None:
