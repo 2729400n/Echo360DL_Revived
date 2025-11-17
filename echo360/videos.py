@@ -191,62 +191,6 @@ class EchoVideo(object):
         return [self]
     
 
-class EchoCloudCollectionVideoGroups(EchoVideos):
-    def __init__(
-        self, videos_json, driver, hostname, alternative_feeds, skip_video_on_error=True
-    ):
-        assert videos_json is not None
-        self._driver = driver
-        self._videos = []
-        total_videos_num = len(videos_json)
-        update_collection_retrieval_progress(0, total_videos_num)
-
-        for i, video_json in enumerate(videos_json):
-            try:
-                self._videos.append(
-                    EchoCloudCollectionVideos(
-                        video_json["content"], self._driver, hostname, alternative_feeds, is_collection=True
-                    )
-                )
-            except Exception:
-                if not skip_video_on_error:
-                    raise
-            update_collection_retrieval_progress(i + 1, total_videos_num)
-
-        self._videos.sort(key=operator.attrgetter("date"))
-
-    @property
-    def videos(self):
-        return self._videos
-    
-
-class EchoCloudCollectionVideos(EchoVideos):
-    def __init__(
-        self, videos_json, driver, hostname, alternative_feeds, skip_video_on_error=True
-    ):
-        assert videos_json is not None
-        self._driver = driver
-        self._videos = []
-        total_videos_num = len(videos_json)
-        update_collection_retrieval_progress(0, total_videos_num)
-
-        for i, video_json in enumerate(videos_json):
-            try:
-                self._videos.append(
-                    EchoCloudCollectionVideo(
-                        video_json, self._driver, hostname, alternative_feeds, is_collection=True
-                    )
-                )
-            except Exception:
-                if not skip_video_on_error:
-                    raise
-            update_collection_retrieval_progress(i + 1, total_videos_num)
-
-        self._videos.sort(key=operator.attrgetter("date"))
-
-    @property
-    def videos(self):
-        return self._videos
 
 
 class EchoCloudVideos(EchoVideos):

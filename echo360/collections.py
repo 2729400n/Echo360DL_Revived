@@ -22,12 +22,9 @@ class EchoCloudCollection(EchoCourse):
             try:
                 course_data_json = self._get_course_data()
                 videos_json = course_data_json["data"]
-                self._videos = EchoCloudVideos(
+                self._videos = EchoCloudCollectionVideoGroups(
                     videos_json, self._driver, self.hostname, self._alternative_feeds
                 )
-            # except KeyError as e:
-            #     print("Unable to parse course videos from JSON (course_data)")
-            #     raise e
             except selenium.common.exceptions.NoSuchElementException as e:
                 print("selenium cannot find given elements")
                 raise e
@@ -41,26 +38,12 @@ class EchoCloudCollection(EchoCourse):
     @property
     def course_id(self):
         if self._course_id is None:
-            # self.course_data['data'][0]['lesson']['lesson']['displayName']
-            # should be in the format of XXXXX (ABCD1001 - 2020 - Semester 1) ???
-            # canidate = self.course_data['data'][0]['lesson']['video']['published']['courseName']
-            # print(self._course_name)
-            # self._course_name = canidate
-            # Too much variant, it's too hard to have a unique way to extract course id.
-            # we will simply use course name and ignore any course id.
             self._course_id = ""
-            # result = re.search('^[^(]+', canidate)
-            # if result is not None:
-            #     self._course_name = result.group()
-            #     result = re.search('[(].+[)]', canidate)
-            #     self._course_id = result.group()[1:-1]
         return self._course_id
 
     @property
     def course_name(self):
         if self._course_name is None:
-            # try each available video as some video might be special has contains
-            # no information about the course.
             for v in self.course_data["data"]:
                 try:
                     self._course_name = v["lesson"]["video"]["published"]["courseName"]
@@ -114,9 +97,6 @@ class EchoCloudCollection(EchoCourse):
                 self._videos = EchoCloudVideos(
                     videos_json, self._driver, self.hostname, self._alternative_feeds
                 )
-            # except KeyError as e:
-            #     print("Unable to parse course videos from JSON (course_data)")
-            #     raise e
             except selenium.common.exceptions.NoSuchElementException as e:
                 print("selenium cannot find given elements")
                 raise e
@@ -130,19 +110,7 @@ class EchoCloudCollection(EchoCourse):
     @property
     def course_id(self):
         if self._course_id is None:
-            # self.course_data['data'][0]['lesson']['lesson']['displayName']
-            # should be in the format of XXXXX (ABCD1001 - 2020 - Semester 1) ???
-            # canidate = self.course_data['data'][0]['lesson']['video']['published']['courseName']
-            # print(self._course_name)
-            # self._course_name = canidate
-            # Too much variant, it's too hard to have a unique way to extract course id.
-            # we will simply use course name and ignore any course id.
             self._course_id = ""
-            # result = re.search('^[^(]+', canidate)
-            # if result is not None:
-            #     self._course_name = result.group()
-            #     result = re.search('[(].+[)]', canidate)
-            #     self._course_id = result.group()[1:-1]
         return self._course_id
 
     @property
@@ -540,3 +508,62 @@ class EchoCloudCollectionVideo(EchoVideo):
 
     def get_all_parts(self):
         return self.sub_videos
+    
+    
+    
+class EchoCloudCollectionVideoGroups(EchoVideos):
+    def __init__(
+        self, videos_json, driver, hostname, alternative_feeds, skip_video_on_error=True
+    ):
+        assert videos_json is not None
+        self._driver = driver
+        self._videos = []
+        total_videos_num = len(videos_json)
+        update_collection_retrieval_progress(0, total_videos_num)
+
+        for i, video_json in enumerate(videos_json):
+            try:
+                self._videos.append(
+                    EchoCloudCollectionVideos(
+                        video_json["content"], self._driver, hostname, alternative_feeds, is_collection=True
+                    )
+                )
+            except Exception:
+                if not skip_video_on_error:
+                    raise
+            update_collection_retrieval_progress(i + 1, total_videos_num)
+
+        self._videos.sort(key=operator.attrgetter("date"))
+
+    @property
+    def videos(self):
+        return self._videos
+    
+
+class EchoCloudCollectionVideos(EchoVideos):
+    def __init__(
+        self, videos_json, driver, hostname, alternative_feeds, skip_video_on_error=True
+    ):
+        assert videos_json is not None
+        self._driver = driver
+        self._videos = []
+        total_videos_num = len(videos_json)
+        update_collection_retrieval_progress(0, total_videos_num)
+
+        for i, video_json in enumerate(videos_json):
+            try:
+                self._videos.append(
+                    EchoCloudCollectionVideo(
+                        video_json, self._driver, hostname, alternative_feeds, is_collection=True
+                    )
+                )
+            except Exception:
+                if not skip_video_on_error:
+                    raise
+            update_collection_retrieval_progress(i + 1, total_videos_num)
+
+        self._videos.sort(key=operator.attrgetter("date"))
+
+    @property
+    def videos(self):
+        return self._videos
