@@ -29,12 +29,7 @@ def update_course_retrieval_progress(current, total):
     sys.stdout.write(text)
     sys.stdout.flush()
     
-def update_collection_retrieval_progress(current, total):
-    prefix = ">> Retrieving echo360 Collection Info... "
-    status = "{}/{} videos".format(current, total)
-    text = "\r{0} {1} ".format(prefix, status)
-    sys.stdout.write(text)
-    sys.stdout.flush()
+
 
 class EchoVideos(object):
     def __init__(self, videos_json, driver):
