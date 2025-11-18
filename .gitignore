@@ -65,3 +65,5 @@ __NOUPLOAD__/respvid.har
 .gitignore
 __NOUPLOAD__/collection_resp.har
 __NOUPLOAD__/
+_echo360dl_store/
+.vscode/

@@ -1,10 +1,16 @@
 import argparse
+import io
+import json
 import os
+import pathlib
 import sys
 import re
 import logging
 import time
+import zipfile
+import requests
 import selenium
+from selenium.webdriver import Chrome
 from datetime import datetime
 
 try:
@@ -21,7 +27,8 @@ from .echo_exceptions import EchoLoginError
 from .downloader import EchoDownloader
 
 from .course import EchoCourse, EchoCloudCourse
-from .utils import PERSISTENT_SESSION_FOLDER
+from .collections import EchoCloudCollection
+from .utils import PERSISTENT_SESSION_FILE, PERSISTENT_SESSION_FOLDER
 
 _DEFAULT_BEFORE_DATE = datetime(2900, 1, 1).date()
 _DEFAULT_AFTER_DATE = datetime(1100, 1, 1).date()
@@ -276,6 +283,23 @@ def main():
         usingEcho360Cloud,
         persistent_session,
     ) = handle_args()
+    
+    bin_path =(pathlib.Path.home()/".echo360dl"/"content"/"bin").absolute()
+    os.environ["PATH"]=f'{(os.environ.get("PATH", "") or os.environ.get("path", "")).removesuffix(os.pathsep)}{os.pathsep}{(bin_path/"bin"/"bin").absolute()}'
+    print(f"ffmpeg version")
+    if(os.system("ffmpeg -version")!=0):
+        print("Would you like to download ffmpeg as it seems you don't have it installed")
+        if(input("[Y/n]?\t").strip().lower()[:1]=='y'):
+            
+            if not (bin_path/"bin/bin/ffmpeg.exe").exists():
+                resp=requests.get("https://github.com/GyanD/codexffmpeg/releases/download/8.0/ffmpeg-8.0-full_build.zip")
+                ffmpeg_archive =zipfile.ZipFile(io.BytesIO(resp.content))
+                ffmpeg_archive.extractall(bin_path)
+                os.rename((bin_path/"ffmpeg-8.0-full_build"), (bin_path/"bin"))
+            os.environ["PATH"]=f'{(os.environ.get("PATH", "") or os.environ.get("path", "")).removesuffix(os.pathsep)}{os.pathsep}{(bin_path/"bin"/"bin").absolute()}'
+            
+            
+            
 
     setup_logging(enable_degbug)
 
@@ -296,6 +320,8 @@ def main():
             os.access(os.path.join(path, x), os.X_OK)
             for path in os.environ["PATH"].split(os.pathsep)
         )
+        
+    
 
     # NOTE: local binary will always override system PATH binary
     use_local_binary = True
@@ -351,7 +377,11 @@ def main():
         course_uuid = re.search(
             "[^/]([0-9a-zA-Z]+[-])+[0-9a-zA-Z]+", course_url
         ).group()  # retrieve the last part of the URL
-        course = EchoCloudCourse(course_uuid, course_hostname, alternative_feeds)
+        
+        if not(re.search("/collections/",course_url)):
+            course = EchoCloudCourse(course_uuid, course_hostname, alternative_feeds)
+        else:
+            course = EchoCloudCollection(course_uuid, course_hostname,alternative_feeds)
     else:
         # import it here for monkey patching gevent, to fix the followings:
         # MonkeyPatchWarning: Monkey-patching ssl after ssl has already been
@@ -375,6 +405,14 @@ def main():
         interactive_mode=interactive_mode,
         persistent_session=persistent_session,
     )
+    
+    driver=downloader._driver
+    driver.get(course_hostname)
+    if(persistent_session) and (PERSISTENT_SESSION_FILE.exists()) and PERSISTENT_SESSION_FILE.is_file():
+        with PERSISTENT_SESSION_FILE.open("rb") as fp:
+            cookies =json.load(fp)
+            for cookie in cookies:
+                driver.add_cookie(cookie)
 
     _LOGGER.debug(
         '>>> Download will use "{}" webdriver from {} executable <<<'.format(
@@ -408,7 +446,7 @@ def start_download_binary(binary_downloader, binary_type, manual=False):
     print("=" * 65)
 
 
-def run_setup_credential(webdriver, url, echo360_cloud=False, manual=False):
+def run_setup_credential(webdriver:Chrome, url, echo360_cloud=False, manual=False):
     webdriver.get(url)
     # for making it compatiable with Python 2 & 3
     from sys import version_info
@@ -444,6 +482,11 @@ def run_setup_credential(webdriver, url, echo360_cloud=False, manual=False):
                     user_inputs = raw_input("> Type 'continue' and press [enter]\n")
                 if user_inputs.lower() == "continue":
                     break
+        cookies =webdriver.get_cookies()
+        if not(PERSISTENT_SESSION_FOLDER.exists()):
+            PERSISTENT_SESSION_FOLDER.mkdir(parents=True)
+        with PERSISTENT_SESSION_FILE.open("wt") as f:
+            json.dump(cookies,f)
     except KeyboardInterrupt:
         pass
 

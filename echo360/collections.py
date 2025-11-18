@@ -20,10 +20,14 @@ from selenium.common.exceptions import StaleElementReferenceException
 
 import logging
 from slugify import slugify
+import urllib3.util
 
 from .course import (EchoCourse,EchoCloudCourse,EchoVideos,EchoCloudVideos,_LOGGER)
 from .videos import EchoVideos, EchoCloudVideos,EchoCloudSubVideo,EchoVideo
 from .echo_exceptions import NotVideoError
+
+from .hls_downloader import Downloader
+from .naive_m3u8_parser import NaiveM3U8Parser
 
 class MediaURL:
     def __init__(self, url,mediaType,isHls,isLive,qualities=None):
@@ -70,11 +74,16 @@ class EchoCloudCollection(EchoCourse):
                 raise e
 
         return self._videos
+    
+    @property
+    def videos(self):
+        return self._videos or []
 
     @property
     def video_url(self):
-        return "{}/api/ui/groups/{}".format(self._hostname, self._uuid).replace("//","/").strip()
-
+        sts= re.sub("(https?):/*","\\1://","{}/api/ui/groups/{}".format(self._hostname, self._uuid).replace("//","/").strip())
+        print(sts)
+        return sts
     @property
     def course_id(self):
         if self._course_id is None:
@@ -119,12 +128,12 @@ class EchoCloudCollection(EchoCourse):
             if not r.ok:
                 raise Exception("Error: Failed to get m3u8 info for EchoCourse!")
 
-            json_str = r.json()
+            json_str = r.text
         except ValueError as e:
             raise Exception("Unable to retrieve JSON (course_data) from url", e)
         except json.JSONDecodeError as e:
             print("failed to get a json")
-        self.course_data = json_str
+        self.course_data = json.loads(json_str)
         return self.course_data
 
 
@@ -146,12 +155,12 @@ class EchoCloudCollectionVideoGroups(EchoVideos):
 
         for i, video_json in enumerate(videos_json):
             try:
-                self._videos.append(
+                self._videos.extend(
                     EchoCloudCollectionVideos(
-                        video_json["content"], self._driver, hostname, alternative_feeds, is_collection=True
-                    )
+                        video_json["content"], self._driver, hostname, alternative_feeds, video_json["id"]
+                    ).videos
                 )
-            except Exception:
+            except Exception as err:
                 if not skip_video_on_error:
                     raise
             update_collection_retrieval_progress(i + 1, total_videos_num)
@@ -165,7 +174,7 @@ class EchoCloudCollectionVideoGroups(EchoVideos):
 
 class EchoCloudCollectionVideos(EchoVideos):
     def __init__(
-        self, videos_json:list[dict], driver:"Chrome|Edge", hostname:str, alternative_feeds:bool, skip_video_on_error:bool=True
+        self, videos_json:list[dict], driver:"Chrome|Edge", hostname:str, alternative_feeds:bool, collection_id, skip_video_on_error:bool=True
     ):
         assert videos_json is not None
         self._driver = driver
@@ -178,12 +187,12 @@ class EchoCloudCollectionVideos(EchoVideos):
             try:
                 self._videos.append(
                     EchoCloudCollectionVideo(
-                        video_json, self._driver, hostname, alternative_feeds, is_collection=True
+                        video_json, self._driver, hostname, alternative_feeds, collection_id
                     )
                 )
             except NotVideoError as e:
                 continue
-            except Exception:
+            except Exception as err:
                 if not skip_video_on_error:
                     raise
             update_collection_retrieval_progress(i + 1, total_videos_num)
@@ -204,9 +213,9 @@ class EchoCloudCollectionVideo(EchoVideo):
     
     @property
     def date(self)->datetime:
-        return datetime.fromisoformat(self._date)
+        return self._date
 
-    def __init__(self, video_json:dict[str], driver:Chrome|Firefox, hostname:str , alternative_feeds:bool, collection_id:str):
+    def __init__(self, video_json:dict[str], driver:Chrome|Firefox, hostname:str , alternative_feeds:bool, collection_id:str,**kwargs):
         
         if(str(video_json["mediaType"]).strip().lower()!="video"):
             raise NotVideoError("Not a Video")
@@ -215,7 +224,6 @@ class EchoCloudCollectionVideo(EchoVideo):
         self._driver = driver
         self.video_json = video_json
         self._video_id =str(video_json["id"])
-        self._date = str(video_json["createdDate"])
         self.is_multipart_video = False
         self.sub_videos = [self]
         self.download_alternative_feeds = alternative_feeds
@@ -238,7 +246,7 @@ class EchoCloudCollectionVideo(EchoVideo):
         self._url = m3u8_url
 
         self._date = self.get_date(video_json)
-        self._title = video_json["lesson"]["lesson"]["name"]
+        self._title = video_json["title"]
 
     def download(self, output_dir, filename, pool_size=50):
         print("")
@@ -271,7 +279,7 @@ class EchoCloudCollectionVideo(EchoVideo):
             if self.download_alternative_feeds:
                 print("- Downloading video feed {}...".format(counter + 1))
             new_filename = (
-                (filename + str(counter + 1))
+                (f"{str(filename).stip()}_{str(counter + 1)}")
                 if self.download_alternative_feeds
                 else filename
             )
@@ -282,12 +290,15 @@ class EchoCloudCollectionVideo(EchoVideo):
 
         return final_result
 
-    def download_single(self, session, single_url, output_dir, filename, pool_size):
+    def download_single(self, session:requests.Session, single_url:str, output_dir:str, filename:str, pool_size:int):
         if os.path.exists(os.path.join(output_dir, filename + ".mp4")):
             print(" > Skipping downloaded video")
             print("-" * 60)
             return True
-        if single_url.endswith(".m3u8"):
+
+        fname= urllib3.util.parse_url(single_url).path
+        fname
+        if fname.endswith(".m3u8"):
             r = session.get(single_url)
             if not r.ok:
                 print("Error: Failed to get m3u8 info. Skipping this video")
@@ -300,6 +311,7 @@ class EchoCloudCollectionVideo(EchoVideo):
             _LOGGER.debug("Searching for m3u8 with content {}".format(lines))
 
             m3u8_parser = NaiveM3U8Parser(lines)
+            
             try:
                 m3u8_parser.parse()
             except Exception as e:
@@ -377,7 +389,9 @@ class EchoCloudCollectionVideo(EchoVideo):
             ff = ffmpy.FFmpeg(
                 global_options="-loglevel panic",
                 inputs=_inputs,
-                outputs={final_file: ["-c:v", "copy", "-c:a", "ac3"]},
+                outputs={
+                    final_file: ["-c:v", "copy", "-c:a", "ac3"]
+                    },
             )
             ff.run()
         except ffmpy.FFExecutableNotFoundError:
@@ -394,28 +408,38 @@ class EchoCloudCollectionVideo(EchoVideo):
 
     def _loop_find_m3u8_url(self, video_url, waitsecond=15, max_attempts=5):
         
-        def brute_force_get_url():
+        def brute_force_get_url(*args,**kwargs):
             # this is the first method I tried, which sort of works
             stale_attempt = 1
             refresh_attempt = 1
             while True:
                 self._driver.get(video_url)
+                session = requests.Session()
+                for cookie in self._driver.get_cookies():
+                    session.cookies.set(cookie["name"], cookie["value"])
+
+                r = session.get(self.video_url)
+                if not r.ok:
+                    raise Exception("Error: Failed to get m3u8 info for EchoCourse!")
+                
                 try:
-                    dats =json.loads(self._driver.page_source.replace("\\/", "/")),
-                    data=dats["data"]
-                    playbackInfo:dict[str] = data["playbackInfo"]["playbackInfo"]
-                    playables:list[dict] = playbackInfo.get("playableMedias")
-                    if(playables is None):
-                        return []
+                    dats =json.loads(r.text.replace("\\/", "/")),
+                    data=dats[0]["data"]
                     urls:list[MediaURL] =[]
-                    for playable in playables:
-                        isHls:bool =  playables["isHls"]
-                        isLive:bool =  playables["isLive"]
-                        mediaUrl = playables["uri"]
-                        trackType = playables["trackType"]
-                        quality = playable.get("quality")
-                        urls+=[MediaURL(mediaUrl,trackType,isHls,isLive,quality)]
-                    return urls
+                    for data_ in data:
+                        playbackInfo:dict[str] = data_["playbackInfo"]['audioVideo']
+                        playables:list[dict] = playbackInfo.get("playableMedias")
+                        if(playables is None):
+                            return []
+                        
+                        for playable in playables:
+                            isHls:bool =  playable["isHls"]
+                            isLive:bool =  playable["isLive"]
+                            mediaUrl = playable["uri"]
+                            trackType = playable["trackType"]
+                            quality = playable.get("quality")
+                            urls+=[MediaURL(mediaUrl,trackType,isHls,isLive,quality)]
+                        return urls
 
                 except selenium.common.exceptions.TimeoutException:
                     if refresh_attempt >= max_attempts:
@@ -460,12 +484,13 @@ class EchoCloudCollectionVideo(EchoVideo):
         
         try:
             _LOGGER.debug("Trying brute_force_all_mp4 method")
-            return brute_force_get_mp4_url()
+            return [i.url for i in brute_force_get_mp4_url() if "video" in [k.lower() for k in i.mediaType]]
         except Exception as e:
             _LOGGER.debug("Encountered exception: {}".format(e))
         try:
             _LOGGER.debug("Trying brute_force_all_m3u8 method")
-            m3u8urls = brute_force_get_url(suffix="m3u8")
+            m3u8urls = [i.url for i in brute_force_get_url() if "video" in [k.lower() for k in i.mediaType]]
+            return m3u8urls
         except Exception as e:
             _LOGGER.debug("Encountered exception: {}".format(e))
             _LOGGER.debug("All methods had been exhausted.")

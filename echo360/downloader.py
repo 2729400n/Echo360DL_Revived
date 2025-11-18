@@ -1,3 +1,4 @@
+import json
 import dateutil.parser
 import os
 from pathlib import Path
@@ -7,7 +8,7 @@ import re
 
 from .course import EchoCloudCourse
 from .echo_exceptions import EchoLoginError
-from .utils import naive_versiontuple, PERSISTENT_SESSION_FOLDER
+from .utils import naive_versiontuple, PERSISTENT_SESSION_FOLDER,PERSISTENT_SESSION_FILE
 
 import pip_ensure_version
 from pick import pick
@@ -69,9 +70,10 @@ def build_chrome_driver(
     opts = Options()
     if not setup_credential:
         opts.add_argument("--headless")
-    if persistent_session:
-        folder_path =  Path(PERSISTENT_SESSION_FOLDER).absolute()  # default current dir
-        opts.add_argument("--user-data-dir='{}'".format(folder_path))
+        
+    # if persistent_session:
+    #     folder_path =  Path(PERSISTENT_SESSION_FOLDER).absolute()  # default current dir
+    #     opts.add_argument("--user-data-dir='{}'".format(folder_path))
     opts.add_argument("--window-size=1920x1080")
     opts.add_argument("user-agent={}".format(user_agent))
 
@@ -84,7 +86,7 @@ def build_chrome_driver(
     if selenium_version_ge_4100:
         from selenium.webdriver.chrome.service import Service
 
-        service = Service(**kwargs, log_file=log_path)
+        service = Service(port=25565,**kwargs, log_file=log_path)
         kwargs = dict(
             service=service,
             options=opts,
@@ -101,7 +103,9 @@ def build_chrome_driver(
                 chrome_options=opts,
             )
         )
-    return webdriver.Chrome(**kwargs)
+    driver = webdriver.Chrome(**kwargs)
+    
+    return driver
 
 
 def build_firefox_driver(
