@@ -420,7 +420,7 @@ class EchoCloudVideo(EchoVideo):
                     urls = set(
                         re.findall(
                             'https://[^,"]*?[.]{}'.format(suffix),
-                            self._driver.page_source.replace("\/", "/"),
+                            self._driver.page_source.replace("\\/", "/"),
                         )
                     )
                     return urls
