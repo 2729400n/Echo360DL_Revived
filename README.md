@@ -85,7 +85,6 @@ echo360-downloader COURSE_URL  # where COURSE_URL is your course url
 The provided script automated every operations, and install all dependency in a local python virtual environment. You can also use the system-wise python installation by manual installation. Get started by first install all requirements:
 
 ```shell
->>>>>>> 10c1887 (added eye candy of gif demo):Readme.md
 pip install -r requirements.txt  # or with: python -m pip install -r requirements.txt
 ```
 
@@ -164,9 +163,6 @@ You are in luck! It is now possible to pick a subset of videos to download from 
     <img src="/doc/images/pick_individual_videos_screenshot.png" width="650" height="auto" >
 </p>
 
->>>>>>> 74bcdfb (added interactive method for downloading):Readme.md
-=======
->>>>>>> 34b8e77 (edited item ordering):Readme.md
 ### Script args
 ```
 >>> usage: echo360.py [-h] [--output OUTPUT_PATH]
@@ -236,7 +232,6 @@ optional arguments:
                         compatibility reason.
 ```
 # Examples
->>>>>>> 10c1887 (added eye candy of gif demo):Readme.md
 
 ```shell
 >>> python echo360.py                  \
