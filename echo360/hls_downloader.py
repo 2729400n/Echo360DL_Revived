@@ -213,13 +213,8 @@ class Downloader:
                         title="  > {}".format("Progress"),
                     )
                     return
-<<<<<<< HEAD
-            except FileNotFoundError as e:
-                print('\r\nError in writing file: {}'.format(e))
-=======
             except EnvironmentError as e:
                 print("\r\nError in writing file: {}".format(e))
->>>>>>> 19ff0ff (blacked)
                 raise HlsDownloaderError
             except:
                 retry -= 1

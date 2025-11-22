@@ -210,25 +210,14 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
-=======
 # appp specific folders
 bin/
 default_out_path/
 _browser_user_data_dir/
-<<<<<<< HEAD
->>>>>>> 401c367 (ignore persistent folder)
-=======
 __NOUPLOAD__/respvid.har
 .gitignore
 __NOUPLOAD__/collection_resp.har
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> edb16f7 (Added some code to handle dealing with collection groups)
-=======
-__NOUPLOAD__/
->>>>>>> 695440d (Updated Gitnore to not track no uploads directory)
-=======
+__NOUPLOAD__
 __NOUPLOAD__/
 _echo360dl_store/
 .vscode/
->>>>>>> 830cc15 (Added stuff for loading collectiosn and persisting data)
