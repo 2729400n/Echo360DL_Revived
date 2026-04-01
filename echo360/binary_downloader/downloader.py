@@ -5,6 +5,7 @@ import stat
 import wget
 import shutil
 import logging
+from pathlib import Path
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -90,5 +91,7 @@ class BinaryDownloader(object):
                 with tarfile.open("{0}/{1}".format(bin_path, filename)) as tar:
                     tar.extractall(path=bin_path)
         # Make the extracted bin executable
-        st = os.stat(self.get_bin())
-        os.chmod(self.get_bin(), st.st_mode | stat.S_IEXEC)
+        
+        bin_path = Path(self.get_bin())
+        st = bin_path.stat()
+        bin_path.chmod(st.st_mode | stat.S_IEXEC)
