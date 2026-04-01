@@ -12,7 +12,7 @@ class ChromedriverDownloader(BinaryDownloader):
     def __init__(self):
         self._name = "chromedriver"
         self._download_link_root = "https://chromedriver.storage.googleapis.com"
-        self._version = "114.0.5735.90"
+        self._version = "146.0.7680.165"
 
     def get_os_suffix(self):
         
