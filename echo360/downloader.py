@@ -15,6 +15,9 @@ from pick import pick
 import selenium
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.webdriver import WebDriver as ChromeWebDriver,ChromiumDriver,Options,DesiredCapabilities,Service
+from selenium.webdriver.chrome.options import ChromiumOptions,Options,DesiredCapabilities
 import selenium.common.exceptions as seleniumException
 import warnings  # hide the warnings of phantomjs being deprecated
 
@@ -83,10 +86,11 @@ def build_chrome_driver(
     else:
         kwargs["chrome_options"] = opts
 
+    driver = None
     if selenium_version_ge_4100:
         from selenium.webdriver.chrome.service import Service
-
-        service = Service(port=25565,**kwargs, log_file=log_path)
+        service=Service(port=25565,log_output=log_path)
+        driver = ChromeWebDriver(opts,service)
         kwargs = dict(
             service=service,
             options=opts,
@@ -103,7 +107,8 @@ def build_chrome_driver(
                 chrome_options=opts,
             )
         )
-    driver = webdriver.Chrome(**kwargs)
+        driver = webdriver.Chrome(**kwargs)
+    
     
     return driver
 
@@ -187,6 +192,7 @@ class EchoDownloader(object):
 
         if webdriver_to_use == "phantomjs":
             selenium_major_version = int(selenium.__version__.split(".")[0])
+            
             if selenium_major_version >= 4:
                 print("============================================================")
                 print("WARNING: PhantomJS support had been removed in in selenium")
@@ -198,6 +204,7 @@ class EchoDownloader(object):
                 )
                 print("============================================================")
 
+        print(naive_versiontuple(selenium.__version__)[:3] , naive_versiontuple("4.10.0"))
         if webdriver_to_use == "chrome":
             driver_builder = build_chrome_driver
         elif webdriver_to_use == "firefox":
@@ -217,6 +224,8 @@ class EchoDownloader(object):
             log_path=log_path,
             persistent_session=persistent_session,
         )
+        print('My Driver',self._driver)
+        self._driver.get('https://www.google.com')
 
         self.setup_credential = setup_credential
         # Monkey Patch, set the course's driver to the one from .downloader
